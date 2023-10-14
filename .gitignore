@@ -1,3 +1,4 @@
 *.pdf
 *.bib
 __pycache__
+*.zip

@@ -1,3 +1,23 @@
+Data (shared on Google Drive, [https://drive.google.com/drive/folders/1_vPJgkUscuTOhaH_5BuPbnHzomBwMZAg?usp=sharing](https://drive.google.com/drive/folders/1_vPJgkUscuTOhaH_5BuPbnHzomBwMZAg?usp=sharing)):
+1. PDF data can be accessed in the subfolder `pdf/`
+    - Right now it contains the following bib files, in total **3045** files:
+    ```text
+    "2023.acl-long.bib",
+    "2023.acl-short.bib",
+    "2022.emnlp-main.bib",
+    "2022.naacl-main.bib",
+    "2022.acl-long.bib",
+    "2022.acl-short.bib",
+    ```
+2. BIB data can be accessed in the subfolder `bib/`
+    - Including all bib files from ACL 2022, ACL 2023, EMNLP 2022, NAACL 2022
+
+Directory structure of this repo:
+```text
+
+```
+
+Crawling steps:
 1. Get all .bib files
     - ACL 2022, ACL 2023, EMNLP 2022, NAACL 2022
         ```bash
@@ -5,3 +25,5 @@
         mv index.html acl-2022.html
         ```
     - use beautifulsoup to get .bib files: `html2bib.py`
+
+2. Download all .pdf files: `bib2pdf.py`
