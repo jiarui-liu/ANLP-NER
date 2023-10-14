@@ -14,7 +14,16 @@ Data (shared on Google Drive, [https://drive.google.com/drive/folders/1_vPJgkUsc
 
 Directory structure of this repo:
 ```text
-
+crawl/
+├── html/
+├── bib/
+├── pdf/
+├── src/
+├── html2bib.py
+├── bib2pdf.py
+├── conf2bib.jsonl
+├── bib2pdf.jsonl
+└── bib2pdf.error.jsonl
 ```
 
 Crawling steps:

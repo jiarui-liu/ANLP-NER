@@ -3,6 +3,7 @@ import os
 import json
 import requests
 import time
+import glob
 
 bib_dir = "bib/"
 pdf_dir = "pdf/"
@@ -14,6 +15,7 @@ f_list = [
     "2022.acl-long.bib",
     "2022.acl-short.bib",
 ]
+# f_list = [file.split("/")[-1] for file in glob.glob(bib_dir + "*.bib")]
 
 json_info_f = open("bib2pdf.jsonl", "a")
 error_f = open("bib2pdf.error.jsonl", "a")
