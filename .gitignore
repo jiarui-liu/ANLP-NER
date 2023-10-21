@@ -2,3 +2,4 @@
 *.bib
 __pycache__
 *.zip
+crawl/text/

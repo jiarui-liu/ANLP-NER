@@ -36,3 +36,5 @@ Crawling steps:
     - use beautifulsoup to get .bib files: `html2bib.py`
 
 2. Download all .pdf files: `bib2pdf.py`
+3. Convert .pdf files to plain text files
+    - `
