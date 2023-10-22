@@ -36,26 +36,26 @@ if __name__ == "__main__":
             pdf_path = os.path.join(pdf_directory, filename)
             try:
                 article_dict = scipdf.parse_pdf_to_dict(pdf_path) # return dictionary
+                json_filename = os.path.splitext(filename)[0] + '.json'
+                json_path = os.path.join(output_directory + 'json/', json_filename)
+                
+                with open(json_path, 'w', encoding='utf-8') as txt_file:
+                    json.dump(article_dict, txt_file)
+                
+                text = extract_text_from_dict(article_dict)
+                paragraphs = split_into_paragraphs(text)
+
+                processed_text = process_paragraphs(paragraphs, nlp)
+                
+                txt_filename = os.path.splitext(filename)[0] + '.txt'
+                txt_path = os.path.join(output_directory + 'formatted/', txt_filename)
+
+                print(f"Processed '{filename}' and saved as '{txt_filename}'.")
+                
+                with open(txt_path, 'w', encoding='utf-8') as txt_file:
+                    txt_file.write(processed_text)
             except Exception as e:
                 json.dump({'filename': filename}, err_f)
                 err_f.write("\n")
-            json_filename = os.path.splitext(filename)[0] + '.json'
-            json_path = os.path.join(output_directory + 'json/', json_filename)
-            
-            with open(json_path, 'w', encoding='utf-8') as txt_file:
-                json.dump(article_dict, txt_file)
-            
-            text = extract_text_from_dict(article_dict)
-            paragraphs = split_into_paragraphs(text)
-
-            processed_text = process_paragraphs(paragraphs, nlp)
-            
-            txt_filename = os.path.splitext(filename)[0] + '.txt'
-            txt_path = os.path.join(output_directory + 'formatted/', txt_filename)
-
-            print(f"Processed '{filename}' and saved as '{txt_filename}'.")
-            
-            with open(txt_path, 'w', encoding='utf-8') as txt_file:
-                txt_file.write(processed_text)
         
         # break
