@@ -1,5 +1,4 @@
-Data (shared on Google Drive, [https://drive.google.com/drive/folders/1_vPJgkUscuTOhaH_5BuPbnHzomBwMZAg?usp=sharing](https://drive.google.com/drive/folders/
-1_vPJgkUscuTOhaH_5BuPbnHzomBwMZAg?usp=sharing)):
+Data (shared on Google Drive, [https://drive.google.com/drive/folders/1_vPJgkUscuTOhaH_5BuPbnHzomBwMZAg?usp=sharing](https://drive.google.com/drive/folders/1_vPJgkUscuTOhaH_5BuPbnHzomBwMZAg?usp=sharing)):
 1. PDF data can be accessed in the subfolder `pdf/`
     - Right now it contains the following bib files, in total **3045** files:
     ```text
@@ -38,4 +37,5 @@ Crawling steps:
 
 2. Download all .pdf files: `bib2pdf.py`
 3. Convert .pdf files to plain text files
-    - `
+    - Install spacy model version: `pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.6.0/en_core_web_lg-3.6.0.tar.gz`
+    - Follow the guide here to convert selected text to the desired format: [https://github.com/cmu-anlp/nlp-from-scratch-assignment-2023/blob/main/annotation_standard.md](https://github.com/cmu-anlp/nlp-from-scratch-assignment-2023/blob/main/annotation_standard.md)

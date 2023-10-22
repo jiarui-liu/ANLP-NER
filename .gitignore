@@ -3,3 +3,4 @@
 __pycache__
 *.zip
 crawl/text/
+grobid-0.6.2/
