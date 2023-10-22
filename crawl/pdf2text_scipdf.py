@@ -13,7 +13,7 @@ def extract_text_from_dict(article_dict):
     for section in article_dict.get("sections", []):
         heading = section.get("heading", "")
         if heading != "":
-            text += heading + " " 
+            text += "\n" + heading + " " 
         txt = section.get("text", "")
         if txt != "":
             text += txt + " "
@@ -23,6 +23,8 @@ if __name__ == "__main__":
     nlp = spacy.load("en_core_web_lg")
     pdf_directory = './pdf/'
     output_directory = './text/scipdf/'
+    err_file = "pdf2text.error.jsonl"
+    err_f = open(err_file, 'a')
 
     for i in [output_directory, output_directory + 'json/', output_directory + 'formatted/']:
         if not os.path.exists(i):
@@ -32,8 +34,11 @@ if __name__ == "__main__":
     for filename in os.listdir(pdf_directory):
         if filename.endswith('.pdf') and filename.replace(".pdf", ".json") not in generated_files:
             pdf_path = os.path.join(pdf_directory, filename)
-            
-            article_dict = scipdf.parse_pdf_to_dict(pdf_path) # return dictionary
+            try:
+                article_dict = scipdf.parse_pdf_to_dict(pdf_path) # return dictionary
+            except Exception as e:
+                json.dump({'filename': filename}, err_f)
+                err_f.write("\n")
             json_filename = os.path.splitext(filename)[0] + '.json'
             json_path = os.path.join(output_directory + 'json/', json_filename)
             
