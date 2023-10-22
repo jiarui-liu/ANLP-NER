@@ -39,3 +39,6 @@ Crawling steps:
 3. Convert .pdf files to plain text files
     - Install spacy model version: `pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.6.0/en_core_web_lg-3.6.0.tar.gz`
     - Follow the guide here to convert selected text to the desired format: [https://github.com/cmu-anlp/nlp-from-scratch-assignment-2023/blob/main/annotation_standard.md](https://github.com/cmu-anlp/nlp-from-scratch-assignment-2023/blob/main/annotation_standard.md)
+    - Method 1: PyPDF2 `crawl/pdf2text_pypdf2.py`
+    - Method 2: SciPDF, better than PyPDF2, can filter out tables, figures, and references, `crawl/pdf2text_scipdf.py`
+        - After running this file, there are 3000 / 7942 pdf files run into convertion error, so their txt files only contain part of the converted text, error files see `pdf2text.error.jsonl`
