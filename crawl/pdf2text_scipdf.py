@@ -2,7 +2,7 @@ import scipdf
 import spacy
 import os
 import json
-from pdf2text_pypdf2 import split_into_paragraphs, process_paragraphs
+from crawl.pdf2text_pypdf2 import split_into_paragraphs, process_paragraphs
 
 def extract_text_from_dict(article_dict):
     text = article_dict.get("title", "")
