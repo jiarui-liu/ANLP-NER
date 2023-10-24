@@ -4,6 +4,17 @@ import os
 import json
 from crawl.pdf2text_pypdf2 import split_into_paragraphs, process_paragraphs
 
+def get_json_list(file_path, start_at=0, end_at=None):
+    with open(file_path, "r") as f:
+        json_list = []
+        for idx, line in enumerate(f):
+            if end_at is not None and idx >= end_at:
+                return json_list
+            elif idx < start_at:
+                continue
+            json_list.append(json.loads(line))
+        return json_list
+
 def extract_text_from_dict(article_dict):
     text = article_dict.get("title", "")
     if text != "":
@@ -25,14 +36,20 @@ if __name__ == "__main__":
     output_directory = './text/scipdf/'
     err_file = "pdf2text.error.jsonl"
     err_f = open(err_file, 'a')
+    err_json = [i['filename'] for i in get_json_list(err_file)]
+    
+    test = True
+    if test:
+        test_file = "test_continue_pretrain.jsonl"
+        test_f = open(test_file, 'a')
 
     for i in [output_directory, output_directory + 'json/', output_directory + 'formatted/']:
         if not os.path.exists(i):
             os.makedirs(i)
 
-    generated_files = os.listdir(output_directory)
+    generated_files = os.listdir(output_directory + 'formatted/')
     for filename in os.listdir(pdf_directory):
-        if filename.endswith('.pdf') and filename.replace(".pdf", ".json") not in generated_files:
+        if filename.endswith('.pdf') and filename.replace(".pdf", ".txt") not in generated_files and filename not in err_json:
             pdf_path = os.path.join(pdf_directory, filename)
             try:
                 article_dict = scipdf.parse_pdf_to_dict(pdf_path) # return dictionary
@@ -54,6 +71,11 @@ if __name__ == "__main__":
                 
                 with open(txt_path, 'w', encoding='utf-8') as txt_file:
                     txt_file.write(processed_text)
+                print(filename)
+                if test:
+                    json.dump(filename.replace(".pdf", ".txt"), test_f)
+                    test_f.write("\n")
+                    
             except Exception as e:
                 json.dump({'filename': filename}, err_f)
                 err_f.write("\n")
