@@ -42,3 +42,7 @@ Crawling steps:
     - Method 1: PyPDF2 `crawl/pdf2text_pypdf2.py`
     - Method 2: SciPDF, better than PyPDF2, can filter out tables, figures, and references, `crawl/pdf2text_scipdf.py`
         - After running this file, there are 3000 / 7942 pdf files run into convertion error, so their txt files only contain part of the converted text, error files see `pdf2text.error.jsonl`
+
+- SciBERT: https://github.com/allenai/scibert
+    - Continue-pretrain BERT: `model/sibert/continue_pretrain.py`, https://towardsdatascience.com/how-to-train-bert-aaad00533168
+    - Fine-tune SciBERT: https://github.com/Nikoschenk/language_model_finetuning/blob/master/scibert_fine_tuner.ipynb, https://guptayash2010.medium.com/text-classification-with-scibert-a285d2f2db06
