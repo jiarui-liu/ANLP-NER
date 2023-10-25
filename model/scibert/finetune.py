@@ -3,6 +3,7 @@ import torch
 from transformers import AutoTokenizer, BertForTokenClassification, AutoConfig
 from torch.utils.data import DataLoader
 import nltk
+import re
 
 # for model training labels
 tag2id = {
@@ -54,16 +55,21 @@ def set_seed(seed):
     except ImportError:
         pass
 
-def reevaluate_sentence_boundary(lines):
-    doc = " ".join([line.split(" ")[0] for line in lines if len(line.split(" ")) > 0])
+def reevaluate_sentence_boundary(lines, processed):
+    doc = None
+    if processed:
+        doc = " ".join([re.split("\s+", line)[0] for line in lines if len(re.split("\s+", line)) > 0])
+    else:
+        doc = " ".join([re.split("\s+", line)[0] for line in lines if len(re.split("\s+", line)) > 0 and '-DOCSTART- -X-' not in line])
     sents = nltk.sent_tokenize(doc)
     return sents
 
-def process_conll_file(file_path, processed=False):
+def process_conll_file(file_path):
     """Process the original conll file
     """
     # format the conll file
     flag = False
+    processed = True
     lines = []
     with open(file_path, 'r') as f:
         for line in f.readlines():
@@ -71,26 +77,29 @@ def process_conll_file(file_path, processed=False):
                 lines.append(line)
             else:
                 flag = True
+            if "-DOCSTART- -X-" in line:
+                processed = False
     if flag:
         with open(file_path, 'w') as f:
             f.write("".join(lines))
 
     # format the data structure
+    # sentences in a file
+    words_dir, tags_dir = [], []
+    # words in a sentences
+    new_words, new_tags = [], []
     if not processed:
-        words_dir, tags_dir = [], []
-        new_words, new_tags = [], []
         with open(file_path, 'r') as f:
             lines = f.readlines()
-            sents = reevaluate_sentence_boundary(lines)
-            print(len(sents))
+            sents = reevaluate_sentence_boundary(lines, processed)
             idx = 0
             for line in lines:
-                line = line.split(" ")
-                if len(line) != 4:
-                    continue
-                else:
-                    if line[0].strip() == sents[idx].strip().split(" ")[-1]:
+                line = re.split('\s+', line.strip())
+                if len(line) == 4:
+                    if " ".join(new_words + [line[0]]) == sents[idx]:
                         # new sentence
+                        new_words.append(line[0])
+                        new_tags.append(line[-1])
                         words_dir.append(new_words)
                         tags_dir.append(new_tags)
                         new_words, new_tags = [], []
@@ -99,22 +108,19 @@ def process_conll_file(file_path, processed=False):
                         # this sentence
                         new_words.append(line[0])
                         new_tags.append(line[-1])
-        return words_dir, tags_dir
+        
     else:
-        words_dir, tags_dir = [], []
-        new_words, new_tags = [], []
         with open(file_path, 'r') as f:
             lines = f.readlines()
-            sents = reevaluate_sentence_boundary(lines)
-            print(len(sents))
+            sents = reevaluate_sentence_boundary(lines, processed)
             idx = 0
             for line in lines:
-                line = line.split(" ")
-                if len(line) != 2:
-                    continue
-                else:
-                    if line[0].strip() == sents[idx].strip().split(" ")[-1]:
+                line = re.split('\s+', line.strip())
+                if len(line) == 2:
+                    if " ".join(new_words + [line[0]]) == sents[idx]:
                         # new sentence
+                        new_words.append(line[0])
+                        new_tags.append(line[-1])
                         words_dir.append(new_words)
                         tags_dir.append(new_tags)
                         new_words, new_tags = [], []
@@ -123,7 +129,9 @@ def process_conll_file(file_path, processed=False):
                         # this sentence
                         new_words.append(line[0])
                         new_tags.append(line[-1])
-        return words_dir, tags_dir
+
+    # print(len(words_dir))
+    return words_dir, tags_dir
 
 def build_df(obj):
     import pandas as pd
