@@ -1,54 +1,63 @@
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoConfig, Trainer
+from transformers import (
+    AutoTokenizer,
+    AutoModelForTokenClassification,
+    AutoConfig,
+    Trainer,
+)
 from torch.utils.data import DataLoader, Dataset
 import nltk
 import re
 import datasets
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import pandas as pd
+import csv
+
 
 # for model training labels
 tag2id = {
-    'O': 0,
-    'MethodName': 1,
-    'HyperparameterName': 2,
-    'HyperparameterValue': 3,
-    'MetricName': 4,
-    'MetricValue': 5,
-    'TaskName': 6,
-    'DatasetName': 7,
+    "O": 0,
+    "MethodName": 1,
+    "HyperparameterName": 2,
+    "HyperparameterValue": 3,
+    "MetricName": 4,
+    "MetricValue": 5,
+    "TaskName": 6,
+    "DatasetName": 7,
 }
 
 id2tag = {v: k for k, v in tag2id.items()}
 
 # for postprocessing
 tag2span_tag = {
-    'MethodName': ['B-MethodName', 'I-MethodName'],
-    'HyperparameterName': ['B-HyperparameterName', 'I-HyperparameterName'],
-    'HyperparameterValue': ['B-HyperparameterValue', 'I-HyperparameterValue'],
-    'MetricName': ['B-MetricName', 'I-MetricName'],
-    'MetricValue': ['B-MetricValue', 'I-MetricValue'],
-    'TaskName': ['B-TaskName', 'I-TaskName'],
-    'DatasetName': ['B-DatasetName', 'I-DatasetName'],
+    "MethodName": ["B-MethodName", "I-MethodName"],
+    "HyperparameterName": ["B-HyperparameterName", "I-HyperparameterName"],
+    "HyperparameterValue": ["B-HyperparameterValue", "I-HyperparameterValue"],
+    "MetricName": ["B-MetricName", "I-MetricName"],
+    "MetricValue": ["B-MetricValue", "I-MetricValue"],
+    "TaskName": ["B-TaskName", "I-TaskName"],
+    "DatasetName": ["B-DatasetName", "I-DatasetName"],
 }
 
 full_tag2tag = {
-    'O': 'O',
-    'B-MethodName': 'MethodName',
-    'I-MethodName': 'MethodName',
-    'B-HyperparameterName': 'HyperparameterName',
-    'I-HyperparameterName': 'HyperparameterName',
-    'B-HyperparameterValue': 'HyperparameterValue',
-    'I-HyperparameterValue': 'HyperparameterValue',
-    'B-MetricName': 'MetricName',
-    'I-MetricName': 'MetricName',
-    'B-MetricValue': 'MetricValue',
-    'I-MetricValue': 'MetricValue',
-    'B-TaskName': 'TaskName',
-    'I-TaskName': 'TaskName',
-    'B-DatasetName': 'DatasetName',
-    'I-DatasetName': 'DatasetName',
+    "O": "O",
+    "B-MethodName": "MethodName",
+    "I-MethodName": "MethodName",
+    "B-HyperparameterName": "HyperparameterName",
+    "I-HyperparameterName": "HyperparameterName",
+    "B-HyperparameterValue": "HyperparameterValue",
+    "I-HyperparameterValue": "HyperparameterValue",
+    "B-MetricName": "MetricName",
+    "I-MetricName": "MetricName",
+    "B-MetricValue": "MetricValue",
+    "I-MetricValue": "MetricValue",
+    "B-TaskName": "TaskName",
+    "I-TaskName": "TaskName",
+    "B-DatasetName": "DatasetName",
+    "I-DatasetName": "DatasetName",
 }
+
 
 def set_seed(seed):
     import random
@@ -56,18 +65,21 @@ def set_seed(seed):
 
     if seed is None:
         from efficiency.log import show_time
+
         seed = int(show_time())
 
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
     try:
         import numpy as np
+
         np.random.seed(seed)
     except ImportError:
         pass
 
     try:
         import torch
+
         torch.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
@@ -75,23 +87,36 @@ def set_seed(seed):
     except ImportError:
         pass
 
+
 def reevaluate_sentence_boundary(lines, processed):
     doc = None
     if processed:
-        doc = " ".join([re.split("\s+", line)[0] for line in lines if len(re.split("\s+", line)) > 0])
+        doc = " ".join(
+            [
+                re.split("\s+", line)[0]
+                for line in lines
+                if len(re.split("\s+", line)) > 0
+            ]
+        )
     else:
-        doc = " ".join([re.split("\s+", line)[0] for line in lines if len(re.split("\s+", line)) > 0 and '-DOCSTART- -X-' not in line])
+        doc = " ".join(
+            [
+                re.split("\s+", line)[0]
+                for line in lines
+                if len(re.split("\s+", line)) > 0 and "-DOCSTART- -X-" not in line
+            ]
+        )
     sents = nltk.sent_tokenize(doc)
     return sents
 
+
 def process_conll_file(file_path):
-    """Process the original conll file
-    """
+    """Process the original conll file"""
     # format the conll file
     flag = False
     processed = True
     lines = []
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         for line in f.readlines():
             if line.strip() != "":
                 lines.append(line)
@@ -100,7 +125,7 @@ def process_conll_file(file_path):
             if "-DOCSTART- -X-" in line:
                 processed = False
     if flag:
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             f.write("".join(lines))
 
     # format the data structure
@@ -109,12 +134,12 @@ def process_conll_file(file_path):
     # words in a sentences
     new_words, new_tags = [], []
     if not processed:
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             lines = f.readlines()
             sents = reevaluate_sentence_boundary(lines, processed)
             idx = 0
             for line in lines:
-                line = re.split('\s+', line.strip())
+                line = re.split("\s+", line.strip())
                 if len(line) == 4:
                     if " ".join(new_words + [line[0]]) == sents[idx]:
                         # new sentence
@@ -128,14 +153,14 @@ def process_conll_file(file_path):
                         # this sentence
                         new_words.append(line[0])
                         new_tags.append(line[-1])
-        
+
     else:
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             lines = f.readlines()
             sents = reevaluate_sentence_boundary(lines, processed)
             idx = 0
             for line in lines:
-                line = re.split('\s+', line.strip())
+                line = re.split("\s+", line.strip())
                 if len(line) == 2:
                     if " ".join(new_words + [line[0]]) == sents[idx]:
                         # new sentence
@@ -153,12 +178,15 @@ def process_conll_file(file_path):
     # print(len(words_dir))
     return words_dir, tags_dir
 
+
 def build_df(obj):
     import pandas as pd
+
     df = pd.DataFrame()
     for k in obj:
         df[k] = obj[k]
     return df
+
 
 def compute_metrics(eval_prediction):
     # https://medium.com/@rakeshrajpurohit/customized-evaluation-metrics-with-hugging-face-trainer-3ff00d936f99
@@ -172,29 +200,61 @@ def compute_metrics(eval_prediction):
             if l != -100:
                 preds.append(p)
                 labels.append(l)
-    
-    
+
     return {
         "accuracy": accuracy_score(labels, preds),
-        "precision": precision_score(labels, preds, average='weighted'),
-        "recall": recall_score(labels, preds, average='weighted'),
-        "f1": f1_score(labels, preds, average='weighted'),
+        "precision": precision_score(labels, preds, average="weighted"),
+        "recall": recall_score(labels, preds, average="weighted"),
+        "f1": f1_score(labels, preds, average="weighted"),
     }
-    
+
+
+def csv_2_conll(csv_file_path):
+    csv_df = pd.read_csv(csv_file_path)
+
+    coNLL_format_data = []
+    for index, row in csv_df.iterrows():
+        word = row["input"]
+        coNLL_format_data.append(f"{word}\tO")
+
+    coNLL_file_path = csv_file_path.replace("csv", "conll")
+    with open(coNLL_file_path, "w") as coNLL_file:
+        coNLL_file.write("\n".join(coNLL_format_data))
+
+
+def conll_2_csv(conll_file_path):
+    csv_file_path = conll_file_path.replace(".conll", ".csv")
+    with open(conll_file_path, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+    headers = ["id", "input", "target"]
+    rows = []
+    for line in lines:
+        line = line.strip()
+        if line:
+            fields = line.split()
+            row = {headers[i]: field for i, field in enumerate(fields)}
+            rows.append(row)
+
+    with open(csv_file_path, "w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=headers)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
 
 class TuneDataset(Dataset):
-    def __init__(self, data, tokenizer, device='cpu'):
-        self.words = data['words']
-        self.tags = data['tags']
-        self.device=device
-        
+    def __init__(self, data, tokenizer, device="cpu"):
+        self.words = data["words"]
+        self.tags = data["tags"]
+        self.device = device
+
         self.words_tokenized = tokenizer(
             self.words,
             truncation=True,
             padding=True,
             is_split_into_words=True,
         )
-        
+
         # construct a token level label list
         labels = []
         for idx, token in enumerate(self.words_tokenized.input_ids):
@@ -207,14 +267,13 @@ class TuneDataset(Dataset):
                 else:
                     label.append(tag2id[full_tag2tag[word_level_label[word_id]]])
             labels.append(label)
-                        
-                        
+
         self.x = self.words_tokenized.input_ids
         self.y = labels
 
     def __len__(self):
         return len(self.x)
-    
+
     def __getitem__(self, index):
         x = self.x[index]
         y = self.y[index]
@@ -226,7 +285,7 @@ class TuneDataset(Dataset):
         }
 
 
-class TuneSciBERT():
+class TuneSciBERT:
     def __init__(self, train_dir, val_dir, test_dir, seed=0):
         # set seed
         set_seed(seed=seed)
@@ -235,47 +294,52 @@ class TuneSciBERT():
         self._val = self.prepare_data(val_dir)
         self._test = self.prepare_data(test_dir)
         # device
-        self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        self.device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
         # model and tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
-            'allenai/scibert_scivocab_uncased',
+            "allenai/scibert_scivocab_uncased",
             model_max_length=512,
         )
-        
-        
+
     def load_pretrained_model(self, num_classes, original=False, path=None):
-        config = AutoConfig.from_pretrained('allenai/scibert_scivocab_uncased')
+        config = AutoConfig.from_pretrained("allenai/scibert_scivocab_uncased")
         config.num_labels = num_classes
         config.label2id = tag2id
         config.id2label = id2tag
         print(config)
-        
+
         if original:
-            self.model = AutoModelForTokenClassification.from_pretrained('allenai/scibert_scivocab_uncased', config=config)
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                "allenai/scibert_scivocab_uncased", config=config
+            )
         else:
             # "/home/jiaruil5/anlp/model/save/lr_5e-05_bs_16_epoch_0.pth"
             assert path is not None
             # self.model.load_state_dict(torch.load(path))
-            self.model = AutoModelForTokenClassification.from_pretrained(path, config=config)
-        
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                path, config=config
+            )
+
         # self.model.to(self.device)
-        
+
     def prepare_data(self, dir):
         res_dict = {
-            'words': [],
-            'tags': [],
+            "words": [],
+            "tags": [],
         }
         for filename in os.listdir(dir):
             words, tags = process_conll_file(os.path.join(dir, filename))
-            res_dict['words'].extend(words)
-            res_dict['tags'].extend(tags)
+            res_dict["words"].extend(words)
+            res_dict["tags"].extend(tags)
         return res_dict
-    
+
     def build_dataset(self):
         self.train_data = TuneDataset(self._train, self.tokenizer, self.device)
         self.val_data = TuneDataset(self._val, self.tokenizer, self.device)
         self.test_data = TuneDataset(self._test, self.tokenizer, self.device)
-        
+
     def train(self, training_args):
         self.trainer = Trainer(
             model=self.model,
@@ -286,7 +350,20 @@ class TuneSciBERT():
             tokenizer=self.tokenizer,
         )
         self.trainer.train()
-    
+
     def eval(self):
         results = self.trainer.evaluate()
         print(results)
+
+    def generate_prediction(self, test_dir):
+        self.model.eval()
+        test_set = self.prepare_data(test_dir)
+        test_set = TuneDataset(test_set, self.tokenizer, self.device)
+
+        prediction = []
+
+        with torch.no_grad():
+            for idx, test_entry in test_set:
+                output = self.model(test_entry["input_ids"])
+                predicted_indices = torch.argmax(output, dim=-1)
+        prediction.append(predicted_index)
