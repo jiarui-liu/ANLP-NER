@@ -90,22 +90,9 @@ def set_seed(seed):
 
 def reevaluate_sentence_boundary(lines, processed):
     doc = None
-    if processed:
-        doc = " ".join(
-            [
-                re.split("\s+", line)[0]
-                for line in lines
-                if len(re.split("\s+", line)) > 0
-            ]
-        )
-    else:
-        doc = " ".join(
-            [
-                re.split("\s+", line)[0]
-                for line in lines
-                if len(re.split("\s+", line)) > 0 and "-DOCSTART- -X-" not in line
-            ]
-        )
+    doc = " ".join(
+        [re.split("\s+", line)[0] for line in lines if len(re.split("\s+", line)) > 0]
+    )
     sents = nltk.sent_tokenize(doc)
     return sents
 
