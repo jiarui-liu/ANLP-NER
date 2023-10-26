@@ -162,8 +162,17 @@ def build_df(obj):
 
 def compute_metrics(eval_prediction):
     # https://medium.com/@rakeshrajpurohit/customized-evaluation-metrics-with-hugging-face-trainer-3ff00d936f99
-    preds, labels = eval_prediction
-    preds = preds.argmax(-1)
+    _preds, _labels = eval_prediction
+    _preds = _preds.argmax(-1)
+    # print(preds)
+    # print(labels)
+    preds, labels = [], []
+    for pred, label in zip(_preds, _labels):
+        for p, l in zip(pred, label):
+            if l != -100:
+                preds.append(p)
+                labels.append(l)
+    
     
     return {
         "accuracy": accuracy_score(labels, preds),
