@@ -460,16 +460,18 @@ class TuneSciBERT:
         
         sent_idx = 0
         word_idx = 0
+        df = df.astype({'target': 'str'})
+        print(df.dtypes)
         for idx, row in df.iterrows():
             if pd.isnull(row['input']):
                 sent_idx += 1
                 word_idx = 0
-                df.set_value(idx, 'target', 'O')
+                df.at[idx, 'target'] = 'O'
                 continue
-            df.set_value(idx, 'target', preds[sent_idx][word_idx])
+            df.at[idx, 'target'] = preds[sent_idx][word_idx]
             word_idx += 1
         headers = ['id', 'target']
-        df.to_csv(test_out, columns=headers)
+        df.to_csv(test_out, columns=headers, index=False)
     
     def get_classification_report(self, preds, labels):
         metrics = metric.compute(predictions=self.map_back(preds), references=labels)
@@ -494,6 +496,7 @@ class TuneSciBERT:
             for idx, pred in enumerate(pred_list):
                 if pred == 'O':
                     final_pred_list.append(pred)
+                    store_label = 'O'
                 else:
                     if pred != store_label:
                         first_seen = True
