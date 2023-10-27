@@ -10,10 +10,11 @@ from torch.utils.data import DataLoader, Dataset
 import nltk
 import re
 import datasets
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 import pandas as pd
 import csv
 from tqdm import tqdm
+import evaluate
 
 
 # for model training labels
@@ -59,6 +60,7 @@ full_tag2tag = {
     "I-DatasetName": "DatasetName",
 }
 
+metric = evaluate.load('seqeval')
 
 def set_seed(seed):
     import random
@@ -188,13 +190,19 @@ def compute_metrics(eval_prediction):
             if l != -100:
                 preds.append(p)
                 labels.append(l)
-
+    metrics = metric.compute(predictions=preds, references=labels)
     return {
         "accuracy": accuracy_score(labels, preds),
         "precision": precision_score(labels, preds, average="weighted"),
         "recall": recall_score(labels, preds, average="weighted"),
         "f1": f1_score(labels, preds, average="weighted"),
     }
+    # return {
+    #     "accuracy": metrics['overall_accuracy'],
+    #     "precision": metrics['overall_precision'],
+    #     "recall": metrics['overall_recall'],
+    #     "f1": metrics['overall_f1'],
+    # }
 
 
 def csv_2_conll(csv_file_path):
@@ -405,3 +413,40 @@ class TuneSciBERT:
             
             final_preds.append(final_pred)
         return final_preds, self.test_data.tags, self.test_data.words
+
+    def get_classification_report(self, preds, labels):
+        metrics = metric.compute(predictions=preds, references=labels)
+
+        print({
+            "accuracy": metrics['overall_accuracy'],
+            "precision": metrics['overall_precision'],
+            "recall": metrics['overall_recall'],
+            "f1": metrics['overall_f1'],
+        })
+        preds = [tag2id[j] for i in preds for j in i]
+        labels = [tag2id[full_tag2tag[j]] for i in labels for j in i]
+        print(classification_report(labels, preds))
+    
+    def map_back(self, preds):
+        # preds: a list of list (sentences)
+        first_seen=True
+        store_label = 'O'
+        final_preds = []
+        for pred_list in preds:
+            final_pred_list = []
+            for idx, pred in enumerate(pred_list):
+                if pred == 'O':
+                    final_pred_list.append(pred)
+                else:
+                    if pred != store_label:
+                        first_seen = True
+                    else:
+                        first_seen = False
+                    
+                    if first_seen:
+                        final_pred_list.append(tag2span_tag[pred][0])
+                        store_label = pred
+                    else:
+                        final_pred_list.append(tag2span_tag[pred][1])
+            final_preds.append(final_pred_list)
+        return final_preds
