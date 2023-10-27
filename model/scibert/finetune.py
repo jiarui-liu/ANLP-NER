@@ -13,6 +13,7 @@ import datasets
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import pandas as pd
 import csv
+from tqdm import tqdm
 
 
 # for model training labels
@@ -244,16 +245,21 @@ class TuneDataset(Dataset):
 
         # construct a token level label list
         labels = []
+        self.word_ids = []
         for idx, token in enumerate(self.words_tokenized.input_ids):
             word_level_label = self.tags[idx]
             # print(word_level_label)
             label = []
+            _word_id = []
             for word_id in self.words_tokenized.word_ids(idx):
                 if word_id is None:
                     label.append(-100)
+                    _word_id.append(-100)
                 else:
                     label.append(tag2id[full_tag2tag[word_level_label[word_id]]])
+                    _word_id.append(word_id)
             labels.append(label)
+            self.word_ids.append(_word_id)
 
         self.x = self.words_tokenized.input_ids
         self.y = labels
@@ -269,6 +275,7 @@ class TuneDataset(Dataset):
         return {
             "input_ids": torch.Tensor(x).to(torch.long),
             "labels": torch.Tensor(y).to(torch.long),
+            "word_ids": torch.Tensor(self.word_ids[index]).to(torch.long),
         }
 
 
@@ -336,21 +343,65 @@ class TuneSciBERT:
             compute_metrics=compute_metrics,
             tokenizer=self.tokenizer,
         )
+        self.batch_size = training_args.per_device_train_batch_size
         self.trainer.train()
 
     def eval(self):
         results = self.trainer.evaluate()
         print(results)
 
-    def generate_prediction(self, test_dir):
+    def generate_prediction(self):
         self.model.eval()
-        test_set = self.prepare_data(test_dir)
-        test_set = TuneDataset(test_set, self.tokenizer, self.device)
-
-        prediction = []
-
-        with torch.no_grad():
-            for idx, test_entry in test_set:
-                output = self.model(test_entry["input_ids"])
-                predicted_indices = torch.argmax(output, dim=-1)
-        prediction.append(predicted_index)
+        if not self.test_data:
+            self.test_data = TuneDataset(self._test, self.tokenizer, self.device)
+        
+        final_preds = []
+        # not batched
+        for i, item in tqdm(enumerate(self.test_data)):
+            with torch.no_grad():
+                outputs = self.model(item['input_ids'].reshape(1, -1).to(self.device))
+            
+            words = self.test_data.words[i]
+            final_pred = []
+            
+            label_tmp = []
+            word_id_tmp = -1
+            for label, input_id, word_id, logit in zip(item['labels'], item['input_ids'], item['word_ids'], outputs.logits[0]):
+                pred = torch.argmax(logit)
+                pred = pred.item()
+                label = label.item()
+                input_id = input_id.item()
+                word_id = word_id.item()
+                
+                if word_id != -100:
+                    if word_id != word_id_tmp:
+                        # get label
+                        label_sel = None
+                        counts = {}
+                        for l in label_tmp:
+                            counts[l] = counts.get(l, 0) + 1
+                        counts = {k: v for k, v in sorted(counts.items(), key=lambda item: item[1])}
+                        # print(counts)
+                        for idx, k in enumerate(counts):
+                            if idx == 0:
+                                if k != 0:
+                                    label_sel = k
+                                    break
+                                else:
+                                    continue
+                            if idx == 1:
+                                label_sel = k
+                        if label_sel is None:
+                            label_sel = 0
+                            
+                        for i in range(word_id-word_id_tmp):
+                            final_pred.append(id2tag[label_sel])
+                        
+                        label_tmp = [pred]
+                        word_id_tmp = word_id
+                    else:
+                        label_tmp.append(pred)
+            assert len(words) == len(final_pred)
+            
+            final_preds.append(final_pred)
+        return final_preds, self.test_data.tags, self.test_data.words
