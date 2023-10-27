@@ -12,6 +12,7 @@ import re
 import datasets
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 import pandas as pd
+import numpy as np
 import csv
 from tqdm import tqdm
 import evaluate
@@ -312,7 +313,7 @@ class TuneSciBERT:
         # dataset
         self._train = self.prepare_data(train_dir)
         self._val = self.prepare_data(val_dir)
-        self._test = self.prepare_data(test_dir)
+        # self._test = self.prepare_data(test_dir)
         # device
         self.device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -355,10 +356,32 @@ class TuneSciBERT:
             res_dict["tags"].extend(tags)
         return res_dict
 
+    def prepare_test_data(self, file):
+        df = pd.read_csv(file)
+        _dict = df.to_dict(orient='records')
+        res_dict = {
+            'words': [],
+            'tags': [],
+        }
+        
+        res_words, res_tags = [], []
+        for idx, l in enumerate(_dict):
+            if type(l['input']) == str:
+                res_words.append(l['input'])
+                res_tags.append('O')
+                if idx == len(_dict) - 1:
+                    res_dict['words'].append(res_words)
+                    res_dict['tags'].append(res_tags)
+            else:
+                res_dict['words'].append(res_words)
+                res_dict['tags'].append(res_tags)
+                res_words, res_tags = [], []
+        return res_dict, df
+
     def build_dataset(self):
         self.train_data = TuneDataset(self._train, self.tokenizer, self.device)
         self.val_data = TuneDataset(self._val, self.tokenizer, self.device)
-        self.test_data = TuneDataset(self._test, self.tokenizer, self.device)
+        # self.test_data = TuneDataset(self._test, self.tokenizer, self.device)
 
     def train(self, training_args):
         self.trainer = Trainer(
@@ -375,21 +398,22 @@ class TuneSciBERT:
     def eval(self):
         results = self.trainer.evaluate()
         print(results)
-
-    def generate_prediction(self):
+    
+    def generate_prediction(self, test_data = None):
         self.model.eval()
-        if not self.test_data:
-            self.test_data = TuneDataset(self._test, self.tokenizer, self.device)
+        if test_data is None:
+            test_data = TuneDataset(self._test, self.tokenizer, self.device)
         
         final_preds = []
         # not batched
-        for i, item in tqdm(enumerate(self.test_data)):
+        for i, item in tqdm(enumerate(test_data)):
         # if True:
-        #     i, item = 11, self.test_data.__getitem__(11)
+        #     i, item = 343, self.test_data.__getitem__(343)
+            
             with torch.no_grad():
                 outputs = self.model(item['input_ids'].reshape(1, -1).to(self.device))
             
-            words = self.test_data.words[i]
+            words = test_data.words[i]
             final_pred = []
             
             pred_tmp = []
@@ -400,6 +424,8 @@ class TuneSciBERT:
                 label = label.item()
                 input_id = input_id.item()
                 word_id = word_id.item()
+                
+                
                 
                 if word_id != -100:
                     if word_id != word_id_tmp:
@@ -420,8 +446,28 @@ class TuneSciBERT:
             assert len(words) == len(final_pred)
             
             final_preds.append(final_pred)
-        return final_preds, self.test_data.tags, self.test_data.words
+        return final_preds, test_data.tags, test_data.words
 
+    
+    def test(self, test_file, test_out):
+        self._test, df = self.prepare_test_data(test_file)
+        test_data = TuneDataset(self._test, self.tokenizer, self.device)
+        preds, _, words = self.generate_prediction(test_data=test_data)
+        preds = self.map_back(preds)
+        
+        sent_idx = 0
+        word_idx = 0
+        for idx, row in df.iterrows():
+            if pd.isnull(row['input']):
+                sent_idx += 1
+                word_idx = 0
+                df.set_value(idx, 'target', 'O')
+                continue
+            df.set_value(idx, 'target', preds[sent_idx][word_idx])
+            word_idx += 1
+        headers = ['id', 'target']
+        df.to_csv(test_out, columns=headers)
+    
     def get_classification_report(self, preds, labels):
         metrics = metric.compute(predictions=self.map_back(preds), references=labels)
 
