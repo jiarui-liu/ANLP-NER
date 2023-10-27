@@ -177,6 +177,24 @@ def build_df(obj):
         df[k] = obj[k]
     return df
 
+def select_major_vote(pred_tmp):
+    pred_sel = None
+    counts = {}
+    for l in pred_tmp:
+        counts[l] = counts.get(l, 0) + 1
+    counts = {k: v for k, v in sorted(counts.items(), key=lambda item: item[1])}
+    for idx, k in enumerate(counts):
+        if idx == 0:
+            if k != 0:
+                pred_sel = k
+                break
+            else:
+                continue
+        if idx == 1:
+            pred_sel = k
+    if pred_sel is None:
+        pred_sel = 0
+    return pred_sel
 
 def compute_metrics(eval_prediction):
     # https://medium.com/@rakeshrajpurohit/customized-evaluation-metrics-with-hugging-face-trainer-3ff00d936f99
@@ -366,14 +384,16 @@ class TuneSciBERT:
         final_preds = []
         # not batched
         for i, item in tqdm(enumerate(self.test_data)):
+        # if True:
+        #     i, item = 11, self.test_data.__getitem__(11)
             with torch.no_grad():
                 outputs = self.model(item['input_ids'].reshape(1, -1).to(self.device))
             
             words = self.test_data.words[i]
             final_pred = []
             
-            label_tmp = []
-            word_id_tmp = -1
+            pred_tmp = []
+            word_id_tmp = 0
             for label, input_id, word_id, logit in zip(item['labels'], item['input_ids'], item['word_ids'], outputs.logits[0]):
                 pred = torch.argmax(logit)
                 pred = pred.item()
@@ -384,31 +404,19 @@ class TuneSciBERT:
                 if word_id != -100:
                     if word_id != word_id_tmp:
                         # get label
-                        label_sel = None
-                        counts = {}
-                        for l in label_tmp:
-                            counts[l] = counts.get(l, 0) + 1
-                        counts = {k: v for k, v in sorted(counts.items(), key=lambda item: item[1])}
-                        # print(counts)
-                        for idx, k in enumerate(counts):
-                            if idx == 0:
-                                if k != 0:
-                                    label_sel = k
-                                    break
-                                else:
-                                    continue
-                            if idx == 1:
-                                label_sel = k
-                        if label_sel is None:
-                            label_sel = 0
-                            
-                        for i in range(word_id-word_id_tmp):
-                            final_pred.append(id2tag[label_sel])
+                        pred_sel = select_major_vote(pred_tmp)
                         
-                        label_tmp = [pred]
+                        for i in range(word_id-word_id_tmp):
+                            final_pred.append(id2tag[pred_sel])
+                        
+                        pred_tmp = [pred]
                         word_id_tmp = word_id
                     else:
-                        label_tmp.append(pred)
+                        pred_tmp.append(pred)
+                elif len(pred_tmp) > 0:
+                    pred_sel = select_major_vote(pred_tmp)
+                    final_pred.append(id2tag[pred_sel])
+                    pred_tmp = []
             assert len(words) == len(final_pred)
             
             final_preds.append(final_pred)
