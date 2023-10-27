@@ -190,7 +190,7 @@ def compute_metrics(eval_prediction):
             if l != -100:
                 preds.append(p)
                 labels.append(l)
-    metrics = metric.compute(predictions=preds, references=labels)
+    # metrics = metric.compute(predictions=preds, references=labels)
     return {
         "accuracy": accuracy_score(labels, preds),
         "precision": precision_score(labels, preds, average="weighted"),
@@ -415,7 +415,7 @@ class TuneSciBERT:
         return final_preds, self.test_data.tags, self.test_data.words
 
     def get_classification_report(self, preds, labels):
-        metrics = metric.compute(predictions=preds, references=labels)
+        metrics = metric.compute(predictions=self.map_back(preds), references=labels)
 
         print({
             "accuracy": metrics['overall_accuracy'],
