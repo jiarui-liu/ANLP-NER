@@ -407,8 +407,6 @@ class TuneSciBERT:
         final_preds = []
         # not batched
         for i, item in tqdm(enumerate(test_data)):
-        # if True:
-        #     i, item = 343, self.test_data.__getitem__(343)
             
             with torch.no_grad():
                 outputs = self.model(item['input_ids'].reshape(1, -1).to(self.device))
@@ -418,6 +416,7 @@ class TuneSciBERT:
             
             pred_tmp = []
             word_id_tmp = 0
+            # print(f"word_ids, {item['word_ids']}, input_ids, {len(item['input_ids'])}")
             for label, input_id, word_id, logit in zip(item['labels'], item['input_ids'], item['word_ids'], outputs.logits[0]):
                 pred = torch.argmax(logit)
                 pred = pred.item()
@@ -425,7 +424,7 @@ class TuneSciBERT:
                 input_id = input_id.item()
                 word_id = word_id.item()
                 
-                
+                # print(f'pred: {pred}, label: {label}, input_id: {input_id}, word_id: {word_id}')
                 
                 if word_id != -100:
                     if word_id != word_id_tmp:
@@ -443,6 +442,10 @@ class TuneSciBERT:
                     pred_sel = select_major_vote(pred_tmp)
                     final_pred.append(id2tag[pred_sel])
                     pred_tmp = []
+            #     print(f"final_pred: {final_pred}, length: {len(final_pred)}")
+            # print(f"words: {words}, final_pred: {final_pred}")
+            while (len(final_pred) < len(words)):
+                final_pred.append("O")
             assert len(words) == len(final_pred)
             
             final_preds.append(final_pred)
@@ -451,8 +454,8 @@ class TuneSciBERT:
     
     def test(self, test_file, test_out):
         self._test, df = self.prepare_test_data(test_file)
-        test_data = TuneDataset(self._test, self.tokenizer, self.device)
-        preds, _, words = self.generate_prediction(test_data=test_data)
+        self.test_data = TuneDataset(self._test, self.tokenizer, self.device)
+        preds, _, words = self.generate_prediction(test_data=self.test_data)
         preds = self.map_back(preds)
         
         sent_idx = 0
