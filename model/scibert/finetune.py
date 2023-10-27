@@ -324,16 +324,20 @@ class TuneSciBERT:
             model_max_length=512,
         )
 
-    def load_pretrained_model(self, num_classes, original=False, path=None):
+    def load_pretrained_model(self, num_classes, model, path=None):
         config = AutoConfig.from_pretrained("allenai/scibert_scivocab_uncased")
         config.num_labels = num_classes
         config.label2id = tag2id
         config.id2label = id2tag
         print(config)
 
-        if original:
+        if model == 'SciBERT':
             self.model = AutoModelForTokenClassification.from_pretrained(
                 "allenai/scibert_scivocab_uncased", config=config
+            )
+        elif model == 'DeBERTa':
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                "microsoft/deberta-v3-base", config=config
             )
         else:
             # "/home/jiaruil5/anlp/model/save/lr_5e-05_bs_16_epoch_0.pth"
